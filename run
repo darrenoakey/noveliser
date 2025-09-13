@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import argparse
+from pathlib import Path
+
+# Add src directory to path
+src_dir = Path(__file__).parent / "src"
+sys.path.insert(0, str(src_dir))
+
+from noveliser import write_novel
+from colorama import init, Fore, Style
+
+init(autoreset=True)
+
+
+def create(description: str, chapters: int = 10, sections: int = 10, model: str = "ollama:llama3.2:latest", author: str = "Darren Oakey"):
+    """Create a novel with specified parameters"""
+    # Set output directory relative to script location
+    script_dir = Path(__file__).parent
+    output_dir = script_dir / "output"
+    output_dir.mkdir(exist_ok=True)
+    
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}Starting novel generation...{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}Description: {description}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}Chapters: {chapters}, Sections per chapter: {sections}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}Model: {model}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+    
+    try:
+        result_dir = write_novel(description, output_dir, model, chapters, sections, author)
+        
+        print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}✓ Novel generation complete!{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}Output directory: {result_dir}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        
+        return result_dir
+        
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Generation interrupted by user{Style.RESET_ALL}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n{Fore.RED}Error during generation: {e}{Style.RESET_ALL}")
+        raise
+
+
+def test():
+    """Create a very short test novel (1 chapter, 1 section) and verify EPUB exists"""
+    print(f"{Fore.MAGENTA}Running quick test with minimal novel...{Style.RESET_ALL}")
+    
+    description = "A detective finds a clue that solves an old mystery"
+    result_dir = create(description, chapters=1, sections=1)
+    
+    # Check for EPUB file
+    output_dir = Path(__file__).parent / "output"
+    epub_files = list(output_dir.glob("*.epub"))
+    
+    if epub_files:
+        epub_file = epub_files[-1]  # Get the most recent one
+        print(f"\n{Fore.GREEN}✅ SUCCESS: EPUB created at {epub_file}{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}You can open it with any EPUB reader or check the contents.{Style.RESET_ALL}")
+        return True
+    else:
+        print(f"\n{Fore.RED}❌ FAILURE: No EPUB file found in {output_dir}{Style.RESET_ALL}")
+        return False
+
+
+def test_bigger():
+    """Create a larger test novel (3 chapters, 2 sections each)"""
+    print(f"{Fore.MAGENTA}Running test with bigger novel...{Style.RESET_ALL}")
+    
+    description = "A space explorer discovers an ancient alien civilization on a distant planet"
+    result_dir = create(description, chapters=3, sections=2)
+    
+    # Check for EPUB file
+    output_dir = Path(__file__).parent / "output"
+    epub_files = list(output_dir.glob("*.epub"))
+    
+    if epub_files:
+        epub_file = epub_files[-1]  # Get the most recent one
+        print(f"\n{Fore.GREEN}✅ SUCCESS: Bigger EPUB created at {epub_file}{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}You can open it with any EPUB reader or check the contents.{Style.RESET_ALL}")
+        return True
+    else:
+        print(f"\n{Fore.RED}❌ FAILURE: No EPUB file found in {output_dir}{Style.RESET_ALL}")
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Generate novels using AI')
+    
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Create command
+    create_parser = subparsers.add_parser('create', help='Create a novel')
+    create_parser.add_argument('description', help='Novel description')
+    create_parser.add_argument('--chapters', type=int, default=10,
+                              help='Number of chapters (default: 10)')
+    create_parser.add_argument('--sections', type=int, default=10,
+                              help='Sections per chapter (default: 10)')
+    create_parser.add_argument('--model', default='ollama:llama3.2:latest',
+                              help='LLM model to use')
+    create_parser.add_argument('--author', default='Darren Oakey',
+                              help='Author name for the book (default: Darren Oakey)')
+    
+    # Test command
+    test_parser = subparsers.add_parser('test', help='Create a minimal test novel (1 chapter, 1 section)')
+    
+    # Test bigger command
+    test_bigger_parser = subparsers.add_parser('test_bigger', 
+                                              help='Create a larger test novel (3 chapters, 2 sections each)')
+    
+    args = parser.parse_args()
+    
+    if args.command == 'create':
+        create(args.description, args.chapters, args.sections, args.model, args.author)
+    elif args.command == 'test':
+        if test():
+            sys.exit(0)
+        else:
+            sys.exit(1)
+    elif args.command == 'test_bigger':
+        if test_bigger():
+            sys.exit(0)
+        else:
+            sys.exit(1)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

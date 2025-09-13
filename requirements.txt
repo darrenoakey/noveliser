@@ -1,0 +1,5 @@
+colorama
+pydantic
+pillow
+ebooklib
+pytest
