@@ -11,6 +11,7 @@ sys.path.insert(0, str(src_dir))
 
 from noveliser import write_novel
 from colorama import init, Fore, Style
+from metadata import list_books_by_status, BookStatus, find_book_dir_by_title
 
 init(autoreset=True)
 
@@ -71,14 +72,14 @@ def test():
 def test_bigger():
     """Create a larger test novel (3 chapters, 2 sections each)"""
     print(f"{Fore.MAGENTA}Running test with bigger novel...{Style.RESET_ALL}")
-    
+
     description = "A space explorer discovers an ancient alien civilization on a distant planet"
     result_dir = create(description, chapters=3, sections=2)
-    
+
     # Check for EPUB file
     output_dir = Path(__file__).parent / "output"
     epub_files = list(output_dir.glob("*.epub"))
-    
+
     if epub_files:
         epub_file = epub_files[-1]  # Get the most recent one
         print(f"\n{Fore.GREEN}✅ SUCCESS: Bigger EPUB created at {epub_file}{Style.RESET_ALL}")
@@ -87,6 +88,92 @@ def test_bigger():
     else:
         print(f"\n{Fore.RED}❌ FAILURE: No EPUB file found in {output_dir}{Style.RESET_ALL}")
         return False
+
+
+def list_finished():
+    """List all finished books"""
+    output_dir = Path(__file__).parent / "output"
+    books = list_books_by_status(output_dir, BookStatus.FINISHED)
+
+    if not books:
+        print(f"{Fore.YELLOW}No finished books found{Style.RESET_ALL}")
+        return
+
+    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}📚 Finished Books ({len(books)} total){Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
+
+    for book in books:
+        print(f"{Fore.YELLOW}📖 {book['title']}{Style.RESET_ALL}")
+        print(f"   Author: {book['author']}")
+        print(f"   Description: {book['description'][:100]}...")
+        print(f"   Created: {book['created_at'][:19]}")
+        print(f"   EPUB: {book['epub_path']}")
+        print(f"   Cover: {book['cover_path']}")
+        print()
+
+
+def list_ongoing():
+    """List all ongoing (incomplete) books"""
+    output_dir = Path(__file__).parent / "output"
+    books = list_books_by_status(output_dir, BookStatus.ONGOING)
+
+    if not books:
+        print(f"{Fore.YELLOW}No ongoing books found{Style.RESET_ALL}")
+        return
+
+    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}📝 Ongoing Books ({len(books)} total){Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
+
+    for book in books:
+        print(f"{Fore.YELLOW}📖 {book['title']}{Style.RESET_ALL}")
+        print(f"   Author: {book['author']}")
+        print(f"   Description: {book['description'][:100]}...")
+        print(f"   Started: {book['created_at'][:19]}")
+        print(f"   Last updated: {book['updated_at'][:19]}")
+        print(f"   Progress: {book['completed_steps']} steps completed")
+        if book['current_step']:
+            print(f"   Current step: {book['current_step']}")
+        print(f"   Directory: {book['directory']}")
+        print()
+
+
+def continue_book(title: str):
+    """Continue generating an ongoing book"""
+    output_dir = Path(__file__).parent / "output"
+
+    # Find the book directory
+    novel_dir = find_book_dir_by_title(output_dir, title)
+
+    if not novel_dir:
+        print(f"{Fore.RED}❌ No ongoing book found with title: {title}{Style.RESET_ALL}")
+        print(f"\nUse './run list-ongoing' to see available books to continue")
+        return False
+
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}Continuing novel: {title}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+
+    try:
+        # Call write_novel with continue mode
+        result_dir = write_novel("", output_dir, continue_novel_dir=novel_dir)
+
+        print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}✓ Novel generation complete!{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}Output directory: {result_dir}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+
+        return True
+
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Generation interrupted by user{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}You can continue this book later using: ./run continue \"{title}\"{Style.RESET_ALL}")
+        return False
+    except Exception as e:
+        print(f"\n{Fore.RED}Error during generation: {e}{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}You can try continuing this book later using: ./run continue \"{title}\"{Style.RESET_ALL}")
+        raise
 
 
 def main():
@@ -110,9 +197,22 @@ def main():
     test_parser = subparsers.add_parser('test', help='Create a minimal test novel (1 chapter, 1 section)')
     
     # Test bigger command
-    test_bigger_parser = subparsers.add_parser('test_bigger', 
+    test_bigger_parser = subparsers.add_parser('test_bigger',
                                               help='Create a larger test novel (3 chapters, 2 sections each)')
-    
+
+    # List finished command
+    list_finished_parser = subparsers.add_parser('list-finished',
+                                                help='List all finished books')
+
+    # List ongoing command
+    list_ongoing_parser = subparsers.add_parser('list-ongoing',
+                                               help='List all ongoing (incomplete) books')
+
+    # Continue command
+    continue_parser = subparsers.add_parser('continue',
+                                          help='Continue generating an ongoing book')
+    continue_parser.add_argument('title', help='Title of the book to continue')
+
     args = parser.parse_args()
     
     if args.command == 'create':
@@ -124,6 +224,15 @@ def main():
             sys.exit(1)
     elif args.command == 'test_bigger':
         if test_bigger():
+            sys.exit(0)
+        else:
+            sys.exit(1)
+    elif args.command == 'list-finished':
+        list_finished()
+    elif args.command == 'list-ongoing':
+        list_ongoing()
+    elif args.command == 'continue':
+        if continue_book(args.title):
             sys.exit(0)
         else:
             sys.exit(1)
